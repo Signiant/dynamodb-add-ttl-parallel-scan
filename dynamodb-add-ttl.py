@@ -1,5 +1,5 @@
 import threading
-from threading import Thread, current_thread
+from threading import current_thread
 import boto3
 import argparse
 import sys
@@ -7,6 +7,7 @@ import json
 import decimal
 import time
 import datetime
+import dateutil
 import calendar
 
 
@@ -20,7 +21,8 @@ class DecimalEncoder(json.JSONEncoder):
                 return int(o)
         return super(DecimalEncoder, self).default(o)
 
-def log (message):
+
+def log(message):
     print current_thread().name + ": " + message
 
 
@@ -82,9 +84,7 @@ def get_expiry(base_value, ttl_duration):
 def get_table_key_schema(dynamodb_client, table_name):
     key_schema = {}
 
-    response = dynamodb_client.describe_table(
-        TableName=table_name
-        )
+    response = dynamodb_client.describe_table(TableName=table_name)
 
     if 'ResponseMetadata' in response:
         if 'HTTPStatusCode' in response['ResponseMetadata']:
@@ -101,7 +101,7 @@ def get_table_key_schema(dynamodb_client, table_name):
                         if key_name == attribute_def['AttributeName']:
                             key_type = attribute_def['AttributeType']
 
-                    key_schema[key_name] = {key_type:None}
+                    key_schema[key_name] = {key_type: None}
         else:
             log("ERROR: No http status code in response when trying to describe table " + table_name)
     else:
@@ -147,6 +147,7 @@ def update_item(table_name, key, ttl_attrib_name, ttl_attrib_value, client):
 
     return status
 
+
 def set_key(key_schema, item):
     completed_key = {}
     for attrib in key_schema:
@@ -185,7 +186,7 @@ def process_segment(dynamodb_client=None, table_name=None, key_schema=None, mast
 
     # This will give us all entries without an expiry set
     filter_expression = "attribute_not_exists(#ttl)"
-    attribuite_names = { "#ttl": "ttl" }
+    attribuite_names = {"#ttl": "ttl"}
 
     response = dynamodb_client.scan(
         TableName=table_name,
@@ -200,7 +201,7 @@ def process_segment(dynamodb_client=None, table_name=None, key_schema=None, mast
         current_key = set_key(key_schema, item)
 
         log("Read key " + json.dumps(current_key, cls=DecimalEncoder))
-        ttl_value = compute_ttl_value(master_attribute_name,item, ttl_duration)
+        ttl_value = compute_ttl_value(master_attribute_name, item, ttl_duration)
 
         if ttl_value:
             log("The TTL value is " + str(ttl_value) + " for key " + json.dumps(current_key, cls=DecimalEncoder))
@@ -241,17 +242,17 @@ def process_segment(dynamodb_client=None, table_name=None, key_schema=None, mast
                 log("Unable to determine a ttl value for " + json.dumps(current_key, cls=DecimalEncoder))
 
 
-## mainFile
+# main
 def main(argv):
     result = 0
 
     parser = argparse.ArgumentParser(description='Add TTL attribute to existing DynamoDB table data')
-    parser.add_argument('-d','--duration', help='Add the ttl with original attribute value + this duration (in days)',required=True)
-    parser.add_argument('-m','--masterattrib', help='Existing attribute to base the ttl on (must be a timestamp)',required=True)
-    parser.add_argument('-n','--ttlname', help='Name to use for the new ttl attribute',required=True)
-    parser.add_argument('-r','--region', help='AWS region',required=True)
-    parser.add_argument('-s','--segments', help='Number of segments to use when scanning the table',required=True)
-    parser.add_argument('-t','--table', help='Table name in DynamoDB',required=True)
+    parser.add_argument('-d', '--duration', help='Add the ttl with original attribute value + this duration (in days)', required=True)
+    parser.add_argument('-m', '--masterattrib', help='Existing attribute to base the ttl on (must be a timestamp)', required=True)
+    parser.add_argument('-n', '--ttlname', help='Name to use for the new ttl attribute', required=True)
+    parser.add_argument('-r', '--region', help='AWS region', required=True)
+    parser.add_argument('-s', '--segments', help='Number of segments to use when scanning the table', required=True)
+    parser.add_argument('-t', '--table', help='Table name in DynamoDB', required=True)
 
     args = parser.parse_args()
 
@@ -274,14 +275,14 @@ def main(argv):
                 worker = threading.Thread(
                     target=process_segment,
                     kwargs={
-                    'dynamodb_client': dynamo_handle,
-                    'table_name': args.table,
-                    'key_schema': key_schema,
-                    'master_attribute_name': args.masterattrib,
-                    'ttl_duration': args.duration,
-                    'ttl_attrib_name': args.ttlname,
-                    'segment': i,
-                    'total_segments': pool_size,
+                        'dynamodb_client': dynamo_handle,
+                        'table_name': args.table,
+                        'key_schema': key_schema,
+                        'master_attribute_name': args.masterattrib,
+                        'ttl_duration': args.duration,
+                        'ttl_attrib_name': args.ttlname,
+                        'segment': i,
+                        'total_segments': pool_size,
                     }
                 )
                 pool.append(worker)
@@ -298,5 +299,6 @@ def main(argv):
 
     exit(result)
 
+
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
