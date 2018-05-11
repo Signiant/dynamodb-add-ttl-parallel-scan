@@ -186,7 +186,7 @@ def process_segment(dynamodb_client=None, table_name=None, key_schema=None, mast
 
     # This will give us all entries without an expiry set
     filter_expression = "attribute_not_exists(#ttl)"
-    attribuite_names = {"#ttl": "ttl"}
+    attribuite_names = {"#ttl": ttl_attrib_name}
 
     response = dynamodb_client.scan(
         TableName=table_name,
